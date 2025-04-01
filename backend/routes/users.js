@@ -12,6 +12,7 @@ router.get('/', auth, async (req, res) => {
     }).select('-password');
     res.json(users);
   } catch (error) {
+    console.error('Fetch users error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -25,12 +26,18 @@ router.get('/:id', auth, async (req, res) => {
     }
     res.json(user);
   } catch (error) {
+    console.error('Fetch user error:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
 // Update user profile
 router.put('/:id', auth, async (req, res) => {
+  // Check if user is updating their own profile
+  if (req.params.id !== req.user._id.toString()) {
+    return res.status(403).json({ error: 'Not authorized to update this profile' });
+  }
+
   const updates = Object.keys(req.body);
   const allowedUpdates = ['name', 'bio', 'interests', 'location', 'profilePicture'];
   const isValidOperation = updates.every(update => allowedUpdates.includes(update));
@@ -40,16 +47,19 @@ router.put('/:id', auth, async (req, res) => {
   }
 
   try {
-    const user = await User.findById(req.params.id);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
+    updates.forEach(update => {
+      if (update === 'interests') {
+        // Handle interests as an array
+        req.user[update] = req.body[update].split(',').map(i => i.trim()).filter(i => i);
+      } else {
+        req.user[update] = req.body[update];
+      }
+    });
 
-    updates.forEach(update => user[update] = req.body[update]);
-    await user.save();
-
-    res.json(user);
+    await req.user.save();
+    res.json(req.user);
   } catch (error) {
+    console.error('Update profile error:', error);
     res.status(400).json({ error: error.message });
   }
 });
