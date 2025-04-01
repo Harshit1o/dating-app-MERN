@@ -47,16 +47,32 @@ router.put('/:id', auth, async (req, res) => {
   }
 
   try {
+    // Create an object to store the updates
+    const updateData = {};
+
     updates.forEach(update => {
       if (update === 'interests') {
         // Handle interests as an array
-        req.user[update] = req.body[update].split(',').map(i => i.trim()).filter(i => i);
+        const interestsValue = req.body[update];
+        if (typeof interestsValue === 'string') {
+          // If it's a string, split it into an array
+          updateData[update] = interestsValue.split(',').map(i => i.trim()).filter(i => i);
+        } else if (Array.isArray(interestsValue)) {
+          // If it's already an array, use it as is
+          updateData[update] = interestsValue;
+        } else {
+          throw new Error('Invalid interests format');
+        }
       } else {
-        req.user[update] = req.body[update];
+        // For other fields, use the value as is
+        updateData[update] = req.body[update];
       }
     });
 
+    // Update the user document
+    Object.assign(req.user, updateData);
     await req.user.save();
+
     res.json(req.user);
   } catch (error) {
     console.error('Update profile error:', error);
